@@ -6,12 +6,12 @@ from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.utils import new_agent_text_message
 
-from py_a2a_dapr.actor.hello_world import HelloWorldActorInterface
+from py_a2a_dapr.actor.echo import EchoActorInterface
 
 
-class HelloWorldAgentExecutor(AgentExecutor):
+class EchoAgentExecutor(AgentExecutor):
     def __init__(self):
-        self._actor_type = "HelloWorldActor"
+        self._actor_type = "EchoActor"
         self._factory = ActorProxyFactory(retry_policy=RetryPolicy(max_attempts=3))
         self._dapr_client = DaprClient()
 
@@ -35,13 +35,13 @@ class HelloWorldAgentExecutor(AgentExecutor):
         proxy = ActorProxy.create(
             actor_type=self._actor_type,
             actor_id=ActorId(actor_id=task_id),
-            actor_interface=HelloWorldActorInterface,
+            actor_interface=EchoActorInterface,
             actor_proxy_factory=self._factory,
         )
 
         payload = {"input_text": input_text}
         result = await proxy.invoke_method(
-            method="SayHello", raw_body=json.dumps(payload).encode()
+            method="Echo", raw_body=json.dumps(payload).encode()
         )
         await event_queue.enqueue_event(new_agent_text_message(text=result.decode()))
 
@@ -56,7 +56,7 @@ class HelloWorldAgentExecutor(AgentExecutor):
         proxy = ActorProxy.create(
             actor_type=self._actor_type,
             actor_id=ActorId(actor_id=task_id),
-            actor_interface=HelloWorldActorInterface,
+            actor_interface=EchoActorInterface,
             actor_proxy_factory=self._factory,
         )
         result = await proxy.invoke_method(method="Cancel")

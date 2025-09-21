@@ -7,22 +7,21 @@ from dapr.actor.runtime.config import (
 from fastapi import FastAPI
 import uvicorn
 from dapr.ext.fastapi import DaprActor
-from py_a2a_dapr.actor.hello_world import HelloWorldActor
+from py_a2a_dapr.actor.echo import EchoActor
 
 from contextlib import asynccontextmanager
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("WE ARE HERE")
     dapr_actor = DaprActor(app)
-    await ActorRuntime.register_actor(HelloWorldActor)
-    await dapr_actor.register_actor(HelloWorldActor)
+    await ActorRuntime.register_actor(EchoActor)
+    await dapr_actor.register_actor(EchoActor)
     yield
 
 
 app = FastAPI(
-    title=f"{HelloWorldActor.__name__} Service",
+    title=f"{EchoActor.__name__} Service",
     # We should be using lifespan instead of on_event
     # lifespan=lifespan
 )
@@ -31,7 +30,7 @@ config = ActorRuntimeConfig()
 config.update_actor_type_configs(
     [
         ActorTypeConfig(
-            actor_type=HelloWorldActor.__name__,
+            actor_type=EchoActor.__name__,
             reentrancy=ActorReentrancyConfig(enabled=True),
         )
     ]
@@ -43,8 +42,8 @@ dapr_actor = DaprActor(app)
 
 @app.on_event("startup")
 async def startup_event():
-    await ActorRuntime.register_actor(HelloWorldActor)
-    await dapr_actor.register_actor(HelloWorldActor)
+    await ActorRuntime.register_actor(EchoActor)
+    await dapr_actor.register_actor(EchoActor)
 
 
 def main():

@@ -13,7 +13,7 @@ from a2a.types import (
     AgentSkill,
 )
 
-from py_a2a_dapr.executor.hello_world import HelloWorldAgentExecutor
+from py_a2a_dapr.executor.echo import EchoAgentExecutor
 
 
 async def uvicorn_serve():
@@ -29,16 +29,16 @@ async def uvicorn_serve():
     signal.signal(signal.SIGINT, sigint_handler)
 
     skill = AgentSkill(
-        id="hello_world_skill",
-        name="Say Hello",
-        description="say hello to the user input",
-        tags=["hello", "greet"],
-        examples=["Hello there"],
+        id="echo_skill",
+        name="Echo",
+        description="Echo input messages",
+        tags=["hello", "echo"],
+        examples=["Ahoy, matey!", "Hello, world!", "Good morning!"],
     )
     # This will be the public-facing agent card
     public_agent_card = AgentCard(
-        name="Hello World Agent",
-        description="An agent that can say hello",
+        name="Echo Agent",
+        description="An agent that can echo input messages",
         url=f"http://localhost:{_a2a_uvicorn_port}/",
         version="0.1.0",
         default_input_modes=["text"],
@@ -49,7 +49,7 @@ async def uvicorn_serve():
     )
 
     request_handler = DefaultRequestHandler(
-        agent_executor=HelloWorldAgentExecutor(),
+        agent_executor=EchoAgentExecutor(),
         task_store=InMemoryTaskStore(),
     )
 
