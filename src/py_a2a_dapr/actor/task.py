@@ -3,6 +3,7 @@ import logging
 from abc import abstractmethod
 from typing import Any, Dict
 from dapr.actor import Actor, ActorInterface, actormethod
+from py_a2a_dapr import ic
 
 
 class TaskActorInterface(ActorInterface):
@@ -30,10 +31,25 @@ class TaskActor(Actor, TaskActorInterface):
     async def echo(self, data: Dict[str, Any] | None = None) -> str:
         if self._cancelled:
             return "Cancelled"
+        message_history = await self._state_manager.get_or_add_state(
+            "message_history", []
+        )
+        ic(message_history)
+        timestamp = datetime.now().isoformat()
         if not data or "input_text" not in data:
-            return "Hello World! No input text to echo was provided."
+            input_msg = ""
+            response = f"Echo from {TaskActor.__name__} ({self.id}): Hello World! No input text to echo was provided! @ {timestamp}"
         else:
-            return f"Echo from {TaskActor.__name__} ({self.id}): {data['input_text']} @ {datetime.now().isoformat()}"
+            input_msg = data["input_text"]
+            response = (
+                f"Echo from {TaskActor.__name__} ({self.id}): {input_msg} @ {timestamp}"
+            )
+        message_history.append(
+            {"input": input_msg, "response": response, "timestamp": timestamp}
+        )
+        await self._state_manager.set_state("message_history", message_history)
+        await self._state_manager.save_state()
+        return response
 
     async def cancel(self) -> str:
         self._cancelled = True
