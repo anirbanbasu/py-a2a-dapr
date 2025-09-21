@@ -5,12 +5,10 @@ from uuid import uuid4
 
 import httpx
 
-from a2a.client import A2ACardResolver, A2AClient
+from a2a.client import A2ACardResolver, ClientFactory, ClientConfig
 from a2a.types import (
     AgentCard,
-    MessageSendParams,
-    SendMessageRequest,
-    SendStreamingMessageRequest,
+    Message,
 )
 from a2a.utils.constants import (
     AGENT_CARD_WELL_KNOWN_PATH,
@@ -61,10 +59,10 @@ async def a2a_client_connect() -> None:
             ) from e
 
         # --8<-- [start:send_message]
-        client = A2AClient(
-            httpx_client=httpx_client, agent_card=final_agent_card_to_use
-        )
-        logger.info("A2AClient initialized.")
+        client = ClientFactory(
+            config=ClientConfig(streaming=True, polling=True, httpx_client=httpx_client)
+        ).create(card=final_agent_card_to_use)
+        logger.info("A2A Client initialized.")
 
         send_message_payload: dict[str, Any] = {
             "message": {
@@ -74,28 +72,14 @@ async def a2a_client_connect() -> None:
                 "metadata": {"task_id": "t-1234-5678-90"},
             },
         }
-        request = SendMessageRequest(
-            id=str(uuid4()), params=MessageSendParams(**send_message_payload)
-        )
 
-        response = await client.send_message(request)
-        print(response.model_dump(mode="json", exclude_none=True))
+        streaming_response = client.send_message(
+            Message(**send_message_payload["message"])
+        )
+        async for response in streaming_response:
+            if isinstance(response, Message):
+                print(response.model_dump(mode="json", exclude_none=True))
         # --8<-- [end:send_message]
-
-        # --8<-- [start:send_message_streaming]
-        send_message_payload["message"]["parts"][0]["text"] = (
-            "Hello there, from an A2A client! This is a streaming request."
-        )
-
-        streaming_request = SendStreamingMessageRequest(
-            id=str(uuid4()), params=MessageSendParams(**send_message_payload)
-        )
-
-        stream_response = client.send_message_streaming(streaming_request)
-
-        async for chunk in stream_response:
-            print(chunk.model_dump(mode="json", exclude_none=True))
-        # --8<-- [end:send_message_streaming]
 
 
 def main():
