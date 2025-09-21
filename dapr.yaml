@@ -1,7 +1,7 @@
 # Reference: https://docs.dapr.io/developing-applications/local-development/multi-app-dapr-run/multi-app-template/
 version: 1
 common:
-  configFilePath: ./dapr/config.yaml
+  configFilePath: ./.dapr/config.yaml
   logLevel: info
   env:
     DEBUG: false
@@ -9,7 +9,7 @@ apps:
   - appID: dapr-srv # optional
     appDirPath: . # REQUIRED
     # resourcesPath: .dapr/resources # deprecated
-    resourcesPath: ./dapr/components
+    resourcesPath: ./.dapr/components
     appChannelAddress: 127.0.0.1 # network address where the app listens on. (optional) can be left to default value by convention.
     appProtocol: http
     appPort: 16799 # Should really be the same as the FastAPI port, which seems odd!
