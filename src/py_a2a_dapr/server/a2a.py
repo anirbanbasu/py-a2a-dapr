@@ -13,6 +13,7 @@ from a2a.types import (
     AgentSkill,
 )
 
+from py_a2a_dapr import env
 from py_a2a_dapr.executor.echo import EchoAgentExecutor
 
 
@@ -21,11 +22,12 @@ async def uvicorn_serve():
         """
         Signal handler to shut down the server gracefully.
         """
-        print("[green]Attempting graceful shutdown, please wait...[/green]")
+        print("Attempting graceful shutdown, please wait...")
         # This is absolutely necessary to exit the program
         sys.exit(0)
 
-    _a2a_uvicorn_port = 16800
+    _a2a_uvicorn_host = env.str("APP_A2A_SRV_HOST", "127.0.0.1")
+    _a2a_uvicorn_port = env.int("APP_A2A_SRV_PORT", 16800)
     signal.signal(signal.SIGINT, sigint_handler)
 
     skill = AgentSkill(
@@ -39,7 +41,7 @@ async def uvicorn_serve():
     public_agent_card = AgentCard(
         name="Echo Agent",
         description="An agent that can echo input messages",
-        url=f"http://localhost:{_a2a_uvicorn_port}/",
+        url=f"http://{_a2a_uvicorn_host}:{_a2a_uvicorn_port}/",
         version="0.1.0",
         default_input_modes=["text"],
         default_output_modes=["text"],
@@ -59,7 +61,7 @@ async def uvicorn_serve():
     )
     config = uvicorn.Config(
         a2a_app.build(),
-        host="0.0.0.0",
+        host=_a2a_uvicorn_host,
         port=_a2a_uvicorn_port,
         log_level="info",
     )
