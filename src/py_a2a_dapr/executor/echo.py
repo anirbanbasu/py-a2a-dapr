@@ -43,7 +43,9 @@ class EchoAgentExecutor(AgentExecutor):
         result = await proxy.invoke_method(
             method="Echo", raw_body=json.dumps(payload).encode()
         )
-        await event_queue.enqueue_event(new_agent_text_message(text=result.decode()))
+        await event_queue.enqueue_event(
+            new_agent_text_message(text=result.decode().strip("\"'"))
+        )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue):
         task_id = context._params.message.metadata.get("task_id")
@@ -60,4 +62,6 @@ class EchoAgentExecutor(AgentExecutor):
             actor_proxy_factory=self._factory,
         )
         result = await proxy.invoke_method(method="Cancel")
-        await event_queue.enqueue_event(new_agent_text_message(text=result.decode()))
+        await event_queue.enqueue_event(
+            new_agent_text_message(text=result.decode().strip("\"'"))
+        )

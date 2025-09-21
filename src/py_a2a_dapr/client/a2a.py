@@ -5,6 +5,8 @@ from uuid import uuid4
 
 import httpx
 
+from py_a2a_dapr import env
+
 from a2a.client import A2ACardResolver, ClientFactory, ClientConfig
 from a2a.types import (
     AgentCard,
@@ -22,10 +24,12 @@ async def a2a_client_connect() -> None:
 
     # --8<-- [start:A2ACardResolver]
 
-    base_url = "http://localhost:16800"
+    _a2a_uvicorn_host = env.str("APP_A2A_SRV_HOST", "127.0.0.1")
+    _a2a_uvicorn_port = env.int("APP_A2A_SRV_PORT", 16800)
+    base_url = f"http://{_a2a_uvicorn_host}:{_a2a_uvicorn_port}"
 
     async with httpx.AsyncClient(timeout=600) as httpx_client:
-        # Initialize A2ACardResolver
+        # initialise A2ACardResolver
         resolver = A2ACardResolver(
             httpx_client=httpx_client,
             base_url=base_url,
@@ -33,7 +37,7 @@ async def a2a_client_connect() -> None:
         )
         # --8<-- [end:A2ACardResolver]
 
-        # Fetch Public Agent Card and Initialize Client
+        # Fetch Public Agent Card and initialise Client
         final_agent_card_to_use: AgentCard | None = None
 
         try:
@@ -62,7 +66,7 @@ async def a2a_client_connect() -> None:
         client = ClientFactory(
             config=ClientConfig(streaming=True, polling=True, httpx_client=httpx_client)
         ).create(card=final_agent_card_to_use)
-        logger.info("A2A Client initialized.")
+        logger.info("A2A Client initialised.")
 
         send_message_payload: dict[str, Any] = {
             "message": {
