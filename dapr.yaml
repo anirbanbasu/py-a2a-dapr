@@ -1,0 +1,28 @@
+version: 1
+common: # optional section for variables shared across apps
+  # resourcesPath: ./app/components # any dapr resources to be shared across apps
+  env:  # any environment variable shared across apps
+    DEBUG: true
+apps:
+  - appID: dapr-srv # optional
+    appDirPath: . # REQUIRED
+    # resourcesPath: .dapr/resources # deprecated
+    # resourcesPaths: .dapr/resources # comma separated resources paths. (optional) can be left to default value by convention.
+    appChannelAddress: 127.0.0.1 # network address where the app listens on. (optional) can be left to default value by convention.
+    # configFilePath: .dapr/config.yaml # (optional) can be default by convention too, ignore if file is not found.
+    appProtocol: http
+    appPort: 16799 # Should really be the same as the FastAPI port, which seems odd!
+    # appHealthCheckPath: "/healthz"
+    # unixDomainSocket: "pad-dapr.sock"
+    command: ["uv", "run", "dapr-srv"]
+    logLevel: debug # (optional) can be debug, info, warn, error. default is info.
+    # appLogDestination: file # (optional), can be file, console or fileAndConsole. default is fileAndConsole.
+    # daprdLogDestination: file # (optional), can be file, console or fileAndConsole. default is file.
+  - appID: a2a-srv # optional
+    appDirPath: . # REQUIRED
+    command: ["uv", "run", "a2a-srv"]
+    logLevel: debug # (optional) can be debug, info, warn, error. default is info.
+  # - appID: demo-client # optional
+  #   appDirPath: . # REQUIRED
+  #   command: ["uv", "run", "demo-client"]
+  #   logLevel: debug # (optional) can be debug, info, warn, error. default is info.
