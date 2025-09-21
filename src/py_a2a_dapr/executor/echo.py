@@ -6,12 +6,12 @@ from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.utils import new_agent_text_message
 
-from py_a2a_dapr.actor.echo import EchoActorInterface
+from py_a2a_dapr.actor.task import TaskActorInterface
 
 
 class EchoAgentExecutor(AgentExecutor):
     def __init__(self):
-        self._actor_type = "EchoActor"
+        self._actor_type = "TaskActor"
         self._factory = ActorProxyFactory(retry_policy=RetryPolicy(max_attempts=3))
         self._dapr_client = DaprClient()
 
@@ -35,7 +35,7 @@ class EchoAgentExecutor(AgentExecutor):
         proxy = ActorProxy.create(
             actor_type=self._actor_type,
             actor_id=ActorId(actor_id=task_id),
-            actor_interface=EchoActorInterface,
+            actor_interface=TaskActorInterface,
             actor_proxy_factory=self._factory,
         )
 
@@ -58,7 +58,7 @@ class EchoAgentExecutor(AgentExecutor):
         proxy = ActorProxy.create(
             actor_type=self._actor_type,
             actor_id=ActorId(actor_id=task_id),
-            actor_interface=EchoActorInterface,
+            actor_interface=TaskActorInterface,
             actor_proxy_factory=self._factory,
         )
         result = await proxy.invoke_method(method="Cancel")

@@ -5,7 +5,7 @@ from typing import Any, Dict
 from dapr.actor import Actor, ActorInterface, actormethod
 
 
-class EchoActorInterface(ActorInterface):
+class TaskActorInterface(ActorInterface):
     @abstractmethod
     @actormethod(name="Echo")
     async def echo(self, data: Dict[str, Any] | None = None) -> str: ...
@@ -15,7 +15,7 @@ class EchoActorInterface(ActorInterface):
     async def cancel(self) -> str: ...
 
 
-class EchoActor(Actor, EchoActorInterface):
+class TaskActor(Actor, TaskActorInterface):
     def __init__(self, ctx, actor_id):
         super().__init__(ctx, actor_id)
         self._cancelled = False
@@ -33,7 +33,7 @@ class EchoActor(Actor, EchoActorInterface):
         if not data or "input_text" not in data:
             return "Hello World! No input text to echo was provided."
         else:
-            return f"Echo from {EchoActor.__name__} ({self.id}): {data['input_text']} @ {datetime.now().isoformat()}"
+            return f"Echo from {TaskActor.__name__} ({self.id}): {data['input_text']} @ {datetime.now().isoformat()}"
 
     async def cancel(self) -> str:
         self._cancelled = True

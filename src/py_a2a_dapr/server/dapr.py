@@ -7,7 +7,7 @@ from dapr.actor.runtime.config import (
 from fastapi import FastAPI
 import uvicorn
 from dapr.ext.fastapi import DaprActor
-from py_a2a_dapr.actor.echo import EchoActor
+from py_a2a_dapr.actor.task import TaskActor
 
 from contextlib import asynccontextmanager
 
@@ -17,8 +17,8 @@ from py_a2a_dapr import env
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     dapr_actor = DaprActor(app)
-    # await ActorRuntime.register_actor(EchoActor)
-    await dapr_actor.register_actor(EchoActor)
+    # await ActorRuntime.register_actor(TaskActor)
+    await dapr_actor.register_actor(TaskActor)
     yield
 
 
@@ -32,7 +32,7 @@ config = ActorRuntimeConfig()
 config.update_actor_type_configs(
     [
         ActorTypeConfig(
-            actor_type=EchoActor.__name__,
+            actor_type=TaskActor.__name__,
             reentrancy=ActorReentrancyConfig(enabled=True),
         )
     ]
