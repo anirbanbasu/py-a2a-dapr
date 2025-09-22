@@ -25,34 +25,36 @@ class GradioApp:
         self._a2a_uvicorn_port = env.int("APP_A2A_SRV_PORT", 16800)
         self._a2a_base_url = f"http://{self._a2a_uvicorn_host}:{self._a2a_uvicorn_port}"
 
-    def construct_ui(self):
-        with gr.Blocks() as self.ui:
-            gr.Markdown("# A2A Dapr Gradio Interface")
-
-            bstate_id = gr.BrowserState(
-                storage_key="a2a_dapr_bstate_id", secret="a2a_dapr_bstate_secret"
-            )
-
+    def component_single_a2a_actor(self, bstate_id):
+        with gr.Column() as component:
             with gr.Row(equal_height=True):
                 txt_input = gr.Textbox(
                     label="Input", lines=4, placeholder="Type something..."
                 )
-                txt_output = gr.Textbox(
-                    label="Output", lines=4, placeholder="Output will appear here..."
-                )
-            gr.Examples(
-                examples=["Ahoy there, matey!", "Hello there!", "Test", "Echo this?"],
-                inputs=[txt_input],
-            )
-            btn_submit = gr.Button("Submit")
-            lbl_status = gr.Markdown("> Ready")
+                with gr.Column():
+                    gr.Examples(
+                        label="Example of input messages",
+                        examples=[
+                            "Ahoy there, matey!",
+                            "Hello there!",
+                            "Test",
+                            "Echo this?",
+                        ],
+                        inputs=[txt_input],
+                    )
+                    with gr.Row(equal_height=True):
+                        btn_echo = gr.Button("Echo")
+                        gr.Button("Show message history")
+            with gr.Row(equal_height=True):
+                json_agent_card = gr.JSON(label="A2A Agent Card")
+                json_output = gr.JSON(label="Output")
 
             @gr.on(
-                triggers=[btn_submit.click],
+                triggers=[btn_echo.click],
                 inputs=[txt_input, bstate_id],
-                outputs=[txt_output, lbl_status, bstate_id],
+                outputs=[json_output, json_agent_card, bstate_id],
             )
-            async def btn_submit_clicked(txt_input: str, browser_state_id):
+            async def btn_echo_clicked(txt_input: str, browser_state_id):
                 if not browser_state_id:
                     browser_state_id = str(uuid4())
                 async with httpx.AsyncClient(timeout=600) as httpx_client:
@@ -66,15 +68,10 @@ class GradioApp:
                     )
                     final_agent_card_to_use = await resolver.get_agent_card()
                     logger.info("Successfully fetched public agent card:")
-                    logger.info(
-                        final_agent_card_to_use.model_dump_json(
-                            indent=2, exclude_none=True
-                        )
-                    )
 
                     yield (
                         None,
-                        "> Fetched public agent card from A2A server.",
+                        final_agent_card_to_use.model_dump(),
                         gr.update(value=browser_state_id),
                     )
 
@@ -101,13 +98,26 @@ class GradioApp:
                         if isinstance(response, Message):
                             # print(response.model_dump(mode="json", exclude_none=True))
                             yield (
-                                response.parts[0].root.text,
-                                "> Received response message.",
+                                {"echo_response": response.parts[0].root.text},
+                                final_agent_card_to_use.model_dump(),
                                 gr.update(value=browser_state_id),
                             )
                         else:
                             logger.info(f"Received non-Message response: {response}")
                             ic(response, type(response))
+
+            return component
+
+    def construct_ui(self):
+        with gr.Blocks(fill_width=True, fill_height=True) as self.ui:
+            gr.Markdown("# A2A Dapr Gradio Interface")
+
+            bstate_id = gr.BrowserState(
+                storage_key="a2a_dapr_bstate_id", secret="a2a_dapr_bstate_secret"
+            )
+
+            with gr.Tab(label="Single A2A endpoint, single actor"):
+                self.component_single_a2a_actor(bstate_id)
 
         return self.ui
 

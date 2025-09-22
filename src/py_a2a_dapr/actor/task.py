@@ -36,7 +36,7 @@ class TaskActor(Actor, TaskActorInterface):
         )
         ic(message_history)
         timestamp = datetime.now().isoformat()
-        if not data or "input_text" not in data:
+        if not data or "input_text" not in data or data["input_text"].strip() == "":
             input_msg = ""
             response = f"Echo from {TaskActor.__name__} ({self.id}): Hello World! No input text to echo was provided! @ {timestamp}"
         else:
