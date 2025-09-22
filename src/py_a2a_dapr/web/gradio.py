@@ -160,7 +160,7 @@ class GradioApp:
                                     content="",
                                     metadata={
                                         "title": f"Dapr Actor {response_with_history.current.actor_id}",
-                                        "log": past_message.timestamp.isoformat(),
+                                        "log": response_with_history.current.timestamp.isoformat(),
                                         "status": "done",
                                         "parent_id": msg_id,
                                     },
