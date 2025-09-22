@@ -44,7 +44,7 @@ def main():
     uvicorn.run(
         app,
         host=env.str("APP_HOST", "127.0.0.1"),
-        port=env.int("APP_DAPR_SVC_PORT", 16799),
+        port=env.int("APP_DAPR_SVC_PORT", 32768),
     )
 
 

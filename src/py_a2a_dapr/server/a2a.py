@@ -27,7 +27,7 @@ async def uvicorn_serve():
         sys.exit(0)
 
     _a2a_uvicorn_host = env.str("APP_A2A_SRV_HOST", "127.0.0.1")
-    _a2a_uvicorn_port = env.int("APP_A2A_SRV_PORT", 16800)
+    _a2a_uvicorn_port = env.int("APP_ECHO_A2A_SRV_PORT", 32769)
     signal.signal(signal.SIGINT, sigint_handler)
 
     skill = AgentSkill(

@@ -2,6 +2,7 @@ import logging
 
 from typing import Any
 from uuid import uuid4
+import asyncio
 
 import httpx
 
@@ -16,16 +17,16 @@ from a2a.utils.constants import (
     AGENT_CARD_WELL_KNOWN_PATH,
 )
 
+from py_a2a_dapr.model.task import EchoInput
 
-async def a2a_client_connect() -> None:
+
+async def a2a_echo_client() -> None:
     # Configure logging to show INFO level messages
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)  # Get a logger instance
 
-    # --8<-- [start:A2ACardResolver]
-
     _a2a_uvicorn_host = env.str("APP_A2A_SRV_HOST", "127.0.0.1")
-    _a2a_uvicorn_port = env.int("APP_A2A_SRV_PORT", 16800)
+    _a2a_uvicorn_port = env.int("APP_ECHO_A2A_SRV_PORT", 32769)
     base_url = f"http://{_a2a_uvicorn_host}:{_a2a_uvicorn_port}"
 
     async with httpx.AsyncClient(timeout=600) as httpx_client:
@@ -35,9 +36,6 @@ async def a2a_client_connect() -> None:
             base_url=base_url,
             # agent_card_path uses default, extended_agent_card_path also uses default
         )
-        # --8<-- [end:A2ACardResolver]
-
-        # Fetch Public Agent Card and initialise Client
         final_agent_card_to_use: AgentCard | None = None
 
         try:
@@ -68,28 +66,26 @@ async def a2a_client_connect() -> None:
         ).create(card=final_agent_card_to_use)
         logger.info("A2A Client initialised.")
 
-        send_message_payload: dict[str, Any] = {
-            "message": {
-                "role": "user",
-                "parts": [{"kind": "text", "text": "Hello there, from an A2A client!"}],
-                "messageId": uuid4().hex,
-                "metadata": {"task_id": "t-1234-5678-90"},
-            },
+        input_data = EchoInput(
+            task_id="t-1234-5678-90",
+            input="Hello there, from an A2A client!",
+        )
+
+        send_message: dict[str, Any] = {
+            "role": "user",
+            "parts": [{"kind": "text", "text": input_data.model_dump_json()}],
+            "messageId": uuid4().hex,
         }
 
-        streaming_response = client.send_message(
-            Message(**send_message_payload["message"])
-        )
+        streaming_response = client.send_message(Message(**send_message))
         async for response in streaming_response:
             if isinstance(response, Message):
-                print(response.model_dump(mode="json", exclude_none=True))
+                print(response.parts[0].root.text)
         # --8<-- [end:send_message]
 
 
 def main():
-    import asyncio
-
-    asyncio.run(a2a_client_connect())
+    asyncio.run(a2a_echo_client())
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ apps:
     resourcesPath: ./.dapr/components
     appChannelAddress: 127.0.0.1 # network address where the app listens on. (optional) can be left to default value by convention.
     appProtocol: http
-    appPort: 16799 # Should really be the same as the FastAPI port, which seems odd!
+    appPort: 32768 # Should really be the same as the FastAPI port, which seems odd!
     appHealthCheckPath: "/healthz"
     command: ["uv", "run", "dapr-srv"]
     readBufferSize: 32Ki
