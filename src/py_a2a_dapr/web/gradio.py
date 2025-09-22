@@ -15,7 +15,7 @@ import httpx
 from py_a2a_dapr import env, ic
 import gradio as gr
 
-from py_a2a_dapr.model.task import EchoInput
+from py_a2a_dapr.model.task import EchoInput, EchoResponseWithHistory
 
 logger = logging.getLogger(__name__)
 
@@ -29,34 +29,44 @@ class GradioApp:
 
     def component_single_a2a_actor(self, bstate_id):
         with gr.Column() as component:
+            with gr.Accordion(label="Agent info", open=False):
+                json_agent_card = gr.JSON(label="A2A Agent Card")
             with gr.Row(equal_height=True):
-                txt_input = gr.Textbox(
-                    label="Input", lines=4, placeholder="Type something..."
+                list_task_ids = gr.DataFrame(
+                    scale=1,
+                    type="array",
+                    headers=["Chat IDs"],
                 )
-                with gr.Column():
-                    gr.Examples(
-                        label="Example of input messages",
-                        examples=[
-                            "Ahoy there, matey!",
-                            "Hello there!",
-                            "Test",
-                            "Echo this?",
-                        ],
-                        inputs=[txt_input],
+                with gr.Column(scale=3):
+                    chatbot = gr.Chatbot(
+                        type="messages",
+                        label="Chat History",
                     )
                     with gr.Row(equal_height=True):
-                        btn_echo = gr.Button("Echo")
-                        gr.Button("Show message history")
-            with gr.Row(equal_height=True):
-                json_agent_card = gr.JSON(label="A2A Agent Card")
-                json_output = gr.JSON(label="Output")
+                        txt_input = gr.Textbox(
+                            lines=1, scale=3, placeholder="Type a message..."
+                        )
+                        btn_echo = gr.Button("Send", scale=1)
+                    with gr.Column():
+                        gr.Examples(
+                            label="Example of input messages",
+                            examples=[
+                                "Ahoy there, matey!",
+                                "Hello there!",
+                                "Test",
+                                "Echo this?",
+                            ],
+                            inputs=[txt_input],
+                        )
 
             @gr.on(
-                triggers=[btn_echo.click],
-                inputs=[txt_input, bstate_id],
-                outputs=[json_output, json_agent_card, bstate_id],
+                triggers=[btn_echo.click, txt_input.submit],
+                inputs=[txt_input, chatbot, bstate_id],
+                outputs=[txt_input, chatbot, json_agent_card, list_task_ids, bstate_id],
             )
-            async def btn_echo_clicked(txt_input: str, browser_state_id):
+            async def btn_echo_clicked(
+                txt_input: str, chat_history: list, browser_state_id
+            ):
                 if not browser_state_id:
                     browser_state_id = str(uuid4())
                 async with httpx.AsyncClient(timeout=600) as httpx_client:
@@ -73,7 +83,9 @@ class GradioApp:
 
                     yield (
                         None,
+                        None,
                         final_agent_card_to_use.model_dump(),
+                        gr.update(value=[browser_state_id]),
                         gr.update(value=browser_state_id),
                     )
 
@@ -100,10 +112,72 @@ class GradioApp:
                     streaming_response = client.send_message(Message(**send_message))
                     async for response in streaming_response:
                         if isinstance(response, Message):
-                            # print(response.model_dump(mode="json", exclude_none=True))
+                            response_with_history = (
+                                EchoResponseWithHistory.model_validate_json(
+                                    response.parts[0].root.text
+                                )
+                            )
+                            if len(chat_history) == 0:
+                                # Add any historical messages first.
+                                for past_message in response_with_history.past:
+                                    chat_history.append(
+                                        gr.ChatMessage(
+                                            role="user",
+                                            content=past_message.input,
+                                        )
+                                    )
+                                    msg_id = str(uuid4())
+                                    chat_history.append(
+                                        gr.ChatMessage(
+                                            role="assistant",
+                                            content="",
+                                            metadata={
+                                                "title": f"Dapr Actor {past_message.actor_id}",
+                                                "log": past_message.timestamp.isoformat(),
+                                                "status": "done",
+                                                "parent_id": msg_id,
+                                            },
+                                        )
+                                    )
+                                    chat_history.append(
+                                        gr.ChatMessage(
+                                            role="assistant",
+                                            content=past_message.output,
+                                            metadata={
+                                                "id": msg_id,
+                                            },
+                                        )
+                                    )
+                            chat_history.append(
+                                gr.ChatMessage(
+                                    role="user",
+                                    content=response_with_history.current.input,
+                                )
+                            )
+                            msg_id = str(uuid4())
+                            chat_history.append(
+                                gr.ChatMessage(
+                                    role="assistant",
+                                    content="",
+                                    metadata={
+                                        "title": f"Dapr Actor {response_with_history.current.actor_id}",
+                                        "log": past_message.timestamp.isoformat(),
+                                        "status": "done",
+                                        "parent_id": msg_id,
+                                    },
+                                )
+                            )
+                            chat_history.append(
+                                gr.ChatMessage(
+                                    role="assistant",
+                                    content=response_with_history.current.output,
+                                )
+                            )
                             yield (
-                                response.parts[0].root.text,
+                                None,
+                                chat_history,
                                 final_agent_card_to_use.model_dump(),
+                                gr.update(value=[browser_state_id]),
                                 gr.update(value=browser_state_id),
                             )
                         else:
