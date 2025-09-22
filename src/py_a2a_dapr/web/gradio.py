@@ -79,7 +79,6 @@ class GradioApp:
                         f"Attempting to fetch public agent card from: {self._a2a_base_url}{AGENT_CARD_WELL_KNOWN_PATH}"
                     )
                     final_agent_card_to_use = await resolver.get_agent_card()
-                    logger.info("Successfully fetched public agent card:")
 
                     yield (
                         None,
@@ -94,7 +93,7 @@ class GradioApp:
                             streaming=True, polling=True, httpx_client=httpx_client
                         )
                     ).create(card=final_agent_card_to_use)
-                    logger.info("A2A Client initialised.")
+                    logger.info("A2A client initialised.")
 
                     input_data = EchoInput(
                         task_id=browser_state_id,
