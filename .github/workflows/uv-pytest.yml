@@ -29,7 +29,8 @@ jobs:
         run: uv sync --all-groups
 
       - name: Setup Dapr CLI default version
-        uses: ./
+        uses: dapr/setup-dapr@v1
+        id: install-dapr
 
       - name: Initialize Dapr
         run: |

@@ -9,7 +9,6 @@ class TestHello:
         assert main() == 0
 
     def test_run_main(self, capsys: "pytest.CaptureFixture[str]") -> None:
-        # Run the main function and capture the output
         main()
         captured = capsys.readouterr()
         assert HELLO_MESSAGE in captured.out.strip()
