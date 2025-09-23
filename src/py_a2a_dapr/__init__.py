@@ -1,4 +1,5 @@
 import logging
+from rich.logging import RichHandler
 from environs import Env
 
 try:
@@ -16,4 +17,5 @@ logging.basicConfig(
     level=env.str("APP_LOG_LEVEL", default="INFO").upper(),
     format="%(message)s",
     datefmt="[%X]",
+    handlers=[RichHandler()],
 )
