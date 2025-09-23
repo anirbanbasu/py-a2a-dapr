@@ -1,2 +1,2 @@
 #!/bin/bash
-dapr stop -f .
+dapr stop --run-file dapr.yaml
