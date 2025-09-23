@@ -1,6 +1,15 @@
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=3776ab&labelColor=e4e4e4)](https://www.python.org/downloads/release/python-3120/)
+[![Experimental status](https://img.shields.io/badge/Status-experimental-orange)](#)
+
 # py-a2a-dapr
 
 A template repository for developing Dapr managed Agent2Agent (A2A) systems in Python.
+
+## Overview
+
+![img-components-overview](https://raw.githubusercontent.com/anirbanbasu/py-a2a-dapr/master/docs/images/components-overview.svg)
+
+## Installation and use
 
 - Install [`uv` package manager](https://docs.astral.sh/uv/getting-started/installation/).
 - Install project dependencies by running `uv sync --all-groups`.
