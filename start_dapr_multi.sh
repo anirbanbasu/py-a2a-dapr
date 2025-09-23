@@ -1,5 +1,5 @@
 #!/bin/bash
 # Ensure any existing Dapr instances are stopped
-dapr stop -f .
+dapr stop --run-file dapr.yaml
 # Start Dapr with the specified configuration file
-dapr run -f . &
+dapr run --run-file dapr.yaml &
