@@ -28,5 +28,13 @@ jobs:
       - name: Install the project
         run: uv sync --all-groups
 
+      - name: Setup Dapr CLI default version
+        uses: ./
+
+      - name: Initialize Dapr
+        run: |
+          dapr init
+          dapr --version
+
       - name: Run tests using pytest
         run: uv run --group test pytest -v tests/
