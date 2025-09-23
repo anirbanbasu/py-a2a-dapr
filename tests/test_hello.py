@@ -10,5 +10,6 @@ class TestHello:
 
     def test_run_main(self, capsys: "pytest.CaptureFixture[str]") -> None:
         main()
+        # cosmetic change to trigger workflow
         captured = capsys.readouterr()
         assert HELLO_MESSAGE in captured.out.strip()
