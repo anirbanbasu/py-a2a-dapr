@@ -1,4 +1,6 @@
 import logging
+import signal
+import sys
 from uuid import uuid4
 
 
@@ -30,8 +32,10 @@ class GradioApp:
 
     def component_single_a2a_actor(self):
         with gr.Column() as component:
-            with gr.Accordion(label="Agent info", open=False):
-                json_agent_card = gr.JSON(label="A2A Agent Card")
+            with gr.Accordion(
+                label="Information on the last-used A2A agent", open=False
+            ):
+                json_agent_card = gr.JSON(label="A2A agent card")
             with gr.Row(equal_height=False):
                 with gr.Column(scale=1):
                     gr.Markdown("""
@@ -44,7 +48,11 @@ class GradioApp:
                         )
                         btn_new_chat = gr.Button("New chat", size="sm")
                     list_task_ids = gr.List(
-                        wrap=True, headers=["Chat IDs"], interactive=False
+                        wrap=True,
+                        line_breaks=True,
+                        headers=["Chat IDs"],
+                        column_widths=["160px"],
+                        interactive=False,
                     )
                     state_selected_chat_id = gr.State(value=None)
                 with gr.Column(scale=3):
@@ -58,7 +66,9 @@ class GradioApp:
                     )
                     with gr.Row(equal_height=True):
                         txt_input = gr.Textbox(
-                            lines=1, scale=3, placeholder="Type a message..."
+                            scale=3,
+                            placeholder="Type a message and press Enter or click Send...",
+                            show_copy_button=False,
                         )
                         btn_echo = gr.Button("Send", scale=1)
                     with gr.Column():
@@ -238,8 +248,7 @@ class GradioApp:
                                         role="assistant",
                                         content="",
                                         metadata={
-                                            "title": f"Dapr Actor {past_message.actor_id}",
-                                            "log": past_message.timestamp.isoformat(),
+                                            "title": past_message.timestamp.isoformat(),
                                             "status": "done",
                                             "parent_id": msg_id,
                                         },
@@ -266,8 +275,7 @@ class GradioApp:
                                     role="assistant",
                                     content="",
                                     metadata={
-                                        "title": f"Dapr Actor {response_with_history.current.actor_id}",
-                                        "log": response_with_history.current.timestamp.isoformat(),
+                                        "title": response_with_history.current.timestamp.isoformat(),
                                         "status": "done",
                                         "parent_id": msg_id,
                                     },
@@ -315,15 +323,26 @@ class GradioApp:
 def main():
     app = GradioApp()
 
+    def sigint_handler(signal, frame):
+        """
+        Signal handler to shut down the server gracefully.
+        """
+        print("Attempting graceful shutdown, please wait...")
+        if app:
+            app.shutdown()
+        # Is it necessary to call close on all interfaces?
+        gr.close_all()
+        # This is absolutely necessary to exit the program
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, sigint_handler)
+
     try:
         app.construct_ui().queue().launch(share=False, ssr_mode=False, show_api=False)
     except InterruptedError:
         logger.warning("Gradio server interrupted, shutting down...")
     except Exception as e:
         logger.error(f"Error starting Gradio server. {e}")
-    finally:
-        if app:
-            app.shutdown()
 
 
 if __name__ == "__main__":
