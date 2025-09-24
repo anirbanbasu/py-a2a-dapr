@@ -103,7 +103,7 @@ async def single_a2a_actor(
         send_message = Message(
             role="user",
             parts=[{"kind": "text", "text": input_data.model_dump_json()}],
-            messageId=uuid4().hex,
+            messageId=str(uuid4()),
         )
         logger.info("Sending message to the A2A endpoint")
         streaming_response = client.send_message(send_message)

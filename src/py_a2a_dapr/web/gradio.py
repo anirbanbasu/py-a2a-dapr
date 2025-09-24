@@ -22,25 +22,31 @@ logger = logging.getLogger(__name__)
 class GradioApp:
     def __init__(self):
         # self.ui = None
-        self._a2a_uvicorn_host = env.str("APP_A2A_SRV_HOST", "127.0.0.1")
-        self._a2a_uvicorn_port = env.int("APP_ECHO_A2A_SRV_PORT", 32769)
-        self._a2a_base_url = f"http://{self._a2a_uvicorn_host}:{self._a2a_uvicorn_port}"
+        self._echo_a2a_uvicorn_host = env.str("APP_A2A_SRV_HOST", "127.0.0.1")
+        self._echo_a2a_uvicorn_port = env.int("APP_ECHO_A2A_SRV_PORT", 32769)
+        self._echo_a2a_base_url = (
+            f"http://{self._echo_a2a_uvicorn_host}:{self._echo_a2a_uvicorn_port}"
+        )
 
-    def component_single_a2a_actor(self, bstate_ids):
+    def component_single_a2a_actor(self):
         with gr.Column() as component:
             with gr.Accordion(label="Agent info", open=False):
                 json_agent_card = gr.JSON(label="A2A Agent Card")
             with gr.Row(equal_height=False):
                 with gr.Column(scale=1):
+                    gr.Markdown("""
+                                ## Existing chats
+                                Select an existing chat to continue, or start a new chat.
+                                """)
                     with gr.Row(equal_height=True):
                         btn_chat_delete = gr.Button(
-                            "Delete chat", size="sm", variant="stop"
+                            "Delete chat", size="sm", variant="stop", interactive=False
                         )
                         btn_new_chat = gr.Button("New chat", size="sm")
                     list_task_ids = gr.List(
-                        wrap=True, headers=["Existing chats"], interactive=False
+                        wrap=True, headers=["Chat IDs"], interactive=False
                     )
-                    selected_chat_id = gr.State(value=None)
+                    state_selected_chat_id = gr.State(value=None)
                 with gr.Column(scale=3):
                     bstate_chat_histories = gr.BrowserState(
                         storage_key="a2a_dapr_chat_histories",
@@ -48,7 +54,7 @@ class GradioApp:
                     )
                     chatbot = gr.Chatbot(
                         type="messages",
-                        label="Chat History",
+                        label="Chat history (a new chat will be created if none if selected)",
                     )
                     with gr.Row(equal_height=True):
                         txt_input = gr.Textbox(
@@ -68,122 +74,125 @@ class GradioApp:
                         )
 
             @gr.on(
-                triggers=[bstate_ids.change, self.ui.load],
-                inputs=[bstate_ids],
+                triggers=[bstate_chat_histories.change, self.ui.load],
+                inputs=[bstate_chat_histories],
                 outputs=[list_task_ids],
             )
-            async def btn_chats_refresh_clicked(browser_state_ids):
-                if browser_state_ids:
-                    yield (
-                        [browser_state_ids]
-                        if isinstance(browser_state_ids, str)
-                        else browser_state_ids
-                    )
+            async def btn_chats_refresh_required(bstate_chat_histories: dict):
+                if bstate_chat_histories:
+                    yield (list(bstate_chat_histories.keys()))
                 else:
                     yield []
 
             @gr.on(
-                triggers=[list_task_ids.select],
-                inputs=[bstate_chat_histories],
-                outputs=[selected_chat_id, chatbot],
+                triggers=[state_selected_chat_id.change],
+                inputs=[state_selected_chat_id, bstate_chat_histories],
+                outputs=[btn_chat_delete, chatbot],
             )
-            async def list_task_ids_selected(evt: gr.SelectData, chat_histories: dict):
-                yield (
-                    evt.value,
-                    gr.update(
-                        value=chat_histories.get(evt.value, []),
-                        label=f"Chat ID: {evt.value}",
-                    ),
-                )
+            async def state_selected_chat_id_changed(
+                selected_chat_id: str, chat_histories: dict
+            ):
+                if selected_chat_id and selected_chat_id.strip() != "":
+                    yield (
+                        gr.update(interactive=True),
+                        gr.update(
+                            value=chat_histories.get(selected_chat_id, []),
+                            label=f"Chat ID: {selected_chat_id}",
+                        ),
+                    )
+                else:
+                    yield (
+                        gr.update(interactive=False),
+                        gr.update(
+                            value=[],
+                            label="Chat history (a new chat will be created if none if selected)",
+                        ),
+                    )
+
+            @gr.on(
+                triggers=[list_task_ids.select],
+                outputs=[state_selected_chat_id],
+            )
+            async def list_task_ids_selected(evt: gr.SelectData):
+                yield evt.value
 
             @gr.on(
                 triggers=[btn_chat_delete.click],
-                inputs=[bstate_ids, bstate_chat_histories, selected_chat_id],
-                outputs=[bstate_ids, bstate_chat_histories, selected_chat_id],
+                inputs=[bstate_chat_histories, state_selected_chat_id],
+                outputs=[bstate_chat_histories, state_selected_chat_id],
             )
             async def btn_chat_delete_clicked(
-                browser_state_ids, browser_state_chat_histories: dict, selected_chat_id
+                browser_state_chat_histories: dict, selected_chat_id
             ):
-                if (
-                    selected_chat_id
-                    and browser_state_ids
-                    and browser_state_chat_histories
-                ):
-                    if isinstance(browser_state_ids, list):
-                        if selected_chat_id in browser_state_ids:
-                            browser_state_ids.remove(selected_chat_id)
-                    elif isinstance(browser_state_ids, str):
-                        if selected_chat_id == browser_state_ids:
-                            browser_state_ids = []
+                if selected_chat_id and browser_state_chat_histories:
                     if selected_chat_id in browser_state_chat_histories:
                         del browser_state_chat_histories[selected_chat_id]
-                    selected_chat_id = None
-                yield browser_state_ids, browser_state_chat_histories, selected_chat_id
+                        selected_chat_id = None
+                    else:
+                        gr.Warning(
+                            f"Selected chat ID {selected_chat_id} was not found in histories."
+                        )
+                else:
+                    gr.Warning("No chat was selected to delete.")
+                yield browser_state_chat_histories, selected_chat_id
 
             @gr.on(
                 triggers=[btn_new_chat.click],
-                inputs=[bstate_ids],
-                outputs=[bstate_ids],
+                inputs=[bstate_chat_histories],
+                outputs=[bstate_chat_histories, state_selected_chat_id],
             )
-            async def btn_new_chat_clicked(browser_state_ids):
-                new_chat_id = str(uuid4())
-                if browser_state_ids:
-                    if isinstance(browser_state_ids, list):
-                        browser_state_ids.append(new_chat_id)
-                    else:
-                        browser_state_ids = [browser_state_ids, new_chat_id]
-                else:
-                    browser_state_ids = [new_chat_id]
-
-                yield gr.update(value=browser_state_ids)
+            async def btn_new_chat_clicked(browser_state_chat_histories: dict):
+                new_chat_id = uuid4().hex
+                if not browser_state_chat_histories:
+                    browser_state_chat_histories = {}
+                browser_state_chat_histories[new_chat_id] = []
+                yield browser_state_chat_histories, new_chat_id
 
             @gr.on(
                 triggers=[btn_echo.click, txt_input.submit],
                 inputs=[
                     txt_input,
-                    selected_chat_id,
+                    state_selected_chat_id,
                     bstate_chat_histories,
                     chatbot,
-                    bstate_ids,
                 ],
                 outputs=[
                     txt_input,
                     bstate_chat_histories,
+                    state_selected_chat_id,
                     chatbot,
                     json_agent_card,
-                    bstate_ids,
                 ],
             )
             async def btn_echo_clicked(
                 txt_input: str,
-                selected_chat: str,
+                state_selected_chat: str,
                 browser_state_chat_histories: dict,
                 chat_history: list,
-                browser_state_ids,
             ):
-                selected_chat_id = selected_chat if selected_chat else str(uuid4())
-                if isinstance(browser_state_ids, list):
-                    if selected_chat_id not in browser_state_ids:
-                        browser_state_ids.append(selected_chat_id)
-                else:
-                    browser_state_ids = [selected_chat_id]
+                selected_chat_id = (
+                    state_selected_chat if state_selected_chat else uuid4().hex
+                )
+                if not browser_state_chat_histories:
+                    browser_state_chat_histories = {}
+
                 async with httpx.AsyncClient(timeout=600) as httpx_client:
                     resolver = A2ACardResolver(
                         httpx_client=httpx_client,
-                        base_url=self._a2a_base_url,
+                        base_url=self._echo_a2a_base_url,
                     )
                     # Fetch Public Agent Card and Initialize Client
                     logger.info(
-                        f"Attempting to fetch public agent card from: {self._a2a_base_url}{AGENT_CARD_WELL_KNOWN_PATH}"
+                        f"Attempting to fetch public agent card from: {self._echo_a2a_base_url}{AGENT_CARD_WELL_KNOWN_PATH}"
                     )
                     final_agent_card_to_use = await resolver.get_agent_card()
 
                     yield (
                         None,
                         browser_state_chat_histories,
+                        selected_chat_id,
                         None,
                         final_agent_card_to_use.model_dump(),
-                        gr.update(value=browser_state_ids),
                     )
 
                     client = ClientFactory(
@@ -201,7 +210,7 @@ class GradioApp:
                     send_message = Message(
                         role="user",
                         parts=[{"kind": "text", "text": input_data.model_dump_json()}],
-                        messageId=uuid4().hex,
+                        messageId=str(uuid4()),
                     )
 
                     streaming_response = client.send_message(send_message)
@@ -212,37 +221,39 @@ class GradioApp:
                                     response.parts[0].root.text
                                 )
                             )
-                            if len(chat_history) == 0:
-                                # Add any historical messages first -- they are already in reverse chronological order
-                                for past_message in response_with_history.past:
-                                    chat_history.append(
-                                        gr.ChatMessage(
-                                            role="user",
-                                            content=past_message.input,
-                                        )
+                            # Although this may seem strange to clear the history, it is necessary
+                            # because the chat may have been modified by another call to the same actor from another client.
+                            chat_history.clear()
+                            # Add any historical messages first -- they are already in reverse chronological order
+                            for past_message in response_with_history.past:
+                                chat_history.append(
+                                    gr.ChatMessage(
+                                        role="user",
+                                        content=past_message.input,
                                     )
-                                    msg_id = str(uuid4())
-                                    chat_history.append(
-                                        gr.ChatMessage(
-                                            role="assistant",
-                                            content="",
-                                            metadata={
-                                                "title": f"Dapr Actor {past_message.actor_id}",
-                                                "log": past_message.timestamp.isoformat(),
-                                                "status": "done",
-                                                "parent_id": msg_id,
-                                            },
-                                        )
+                                )
+                                msg_id = str(uuid4())
+                                chat_history.append(
+                                    gr.ChatMessage(
+                                        role="assistant",
+                                        content="",
+                                        metadata={
+                                            "title": f"Dapr Actor {past_message.actor_id}",
+                                            "log": past_message.timestamp.isoformat(),
+                                            "status": "done",
+                                            "parent_id": msg_id,
+                                        },
                                     )
-                                    chat_history.append(
-                                        gr.ChatMessage(
-                                            role="assistant",
-                                            content=past_message.output,
-                                            metadata={
-                                                "id": msg_id,
-                                            },
-                                        )
+                                )
+                                chat_history.append(
+                                    gr.ChatMessage(
+                                        role="assistant",
+                                        content=past_message.output,
+                                        metadata={
+                                            "id": msg_id,
+                                        },
                                     )
+                                )
                             chat_history.append(
                                 gr.ChatMessage(
                                     role="user",
@@ -274,12 +285,12 @@ class GradioApp:
                             yield (
                                 None,
                                 browser_state_chat_histories,
+                                selected_chat_id,
                                 gr.update(
                                     value=chat_history,
-                                    label=f"Chat ID: {selected_chat_id}",
+                                    # label=f"Chat ID: {selected_chat_id}",
                                 ),
                                 final_agent_card_to_use.model_dump(),
-                                gr.update(value=browser_state_ids),
                             )
                         else:
                             logger.info(f"Received non-Message response: {response}")
@@ -291,12 +302,8 @@ class GradioApp:
         with gr.Blocks(fill_width=True, fill_height=True) as self.ui:
             gr.Markdown("# A2A Dapr Gradio Interface")
 
-            bstate_ids = gr.BrowserState(
-                storage_key="a2a_dapr_bstate_ids", secret="a2a_dapr_bstate_secret"
-            )
-
             with gr.Tab(label="Single A2A endpoint, single actor"):
-                self.component_single_a2a_actor(bstate_ids)
+                self.component_single_a2a_actor()
 
         return self.ui
 
