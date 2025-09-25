@@ -1,5 +1,5 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=3776ab&labelColor=e4e4e4)](https://www.python.org/downloads/release/python-3120/)
-[![Experimental status](https://img.shields.io/badge/Status-experimental-orange)](#)
+[![Experimental status](https://img.shields.io/badge/Status-experimental-orange)](#) [![pytest](https://github.com/anirbanbasu/py-a2a-dapr/actions/workflows/uv-pytest.yml/badge.svg)](https://github.com/anirbanbasu/py-a2a-dapr/actions/workflows/uv-pytest.yml)
 
 # py-a2a-dapr
 
