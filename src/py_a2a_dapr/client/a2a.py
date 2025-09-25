@@ -49,9 +49,9 @@ async def single_a2a_actor(
         default="Hello there, from an A2A client!",
         help="The message to send to the A2A endpoint.",
     ),
-    task_id: str = typer.Option(
+    thread_id: str = typer.Option(
         default=str(uuid4()),
-        help="A task ID to identify your conversation. If not specified, a random UUID will be used.",
+        help="A thread ID to identify your conversation. If not specified, a random UUID will be used.",
     ),
 ) -> None:
     """
@@ -96,14 +96,14 @@ async def single_a2a_actor(
         logger.info("A2A client initialised.")
 
         input_data = EchoInput(
-            task_id=task_id,
+            thread_id=thread_id,
             input=message,
         )
 
         send_message = Message(
             role="user",
             parts=[{"kind": "text", "text": input_data.model_dump_json()}],
-            messageId=str(uuid4()),
+            message_id=str(uuid4()),
         )
         logger.info("Sending message to the A2A endpoint")
         streaming_response = client.send_message(send_message)

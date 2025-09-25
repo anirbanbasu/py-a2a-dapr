@@ -7,7 +7,10 @@ from pydantic import BaseModel
 
 
 class TaskActorInput(BaseModel, ABC):
-    task_id: Annotated[str, "Unique identifier for the task"]
+    thread_id: Annotated[
+        str,
+        "Unique identifier for the thread (or task). Not called task_id to avoid confusion with A2A equivalent.",
+    ]
 
 
 class EchoInput(TaskActorInput):

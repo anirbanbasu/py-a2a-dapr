@@ -213,14 +213,14 @@ class GradioApp:
                     logger.info("A2A client initialised.")
 
                     input_data = EchoInput(
-                        task_id=selected_chat_id,
+                        thread_id=selected_chat_id,
                         input=txt_input,
                     )
 
                     send_message = Message(
                         role="user",
                         parts=[{"kind": "text", "text": input_data.model_dump_json()}],
-                        messageId=str(uuid4()),
+                        message_id=str(uuid4()),
                     )
 
                     streaming_response = client.send_message(send_message)
@@ -296,7 +296,6 @@ class GradioApp:
                                 selected_chat_id,
                                 gr.update(
                                     value=chat_history,
-                                    # label=f"Chat ID: {selected_chat_id}",
                                 ),
                                 final_agent_card_to_use.model_dump(),
                             )

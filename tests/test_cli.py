@@ -11,7 +11,7 @@ import subprocess
 
 class TestCLI:
     # TODO: Should this be a fixture instead?
-    task_id = str(uuid4())
+    thread_id = str(uuid4())
 
     @pytest.fixture(scope="class", autouse=True)
     def manage_dapr_sidecars(self):
@@ -55,7 +55,7 @@ class TestCLI:
         runner = CliRunner()
         message = f"Hello there! {iterations}"
         result = runner.invoke(
-            app, ["single-a2a-actor", "--task-id", self.task_id, message]
+            app, ["single-a2a-actor", "--thread-id", self.thread_id, message]
         )
         assert result.exit_code == 0
         validated_response = EchoResponseWithHistory.model_validate_json(result.stdout)

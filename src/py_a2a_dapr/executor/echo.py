@@ -16,18 +16,13 @@ class EchoAgentExecutor(AgentExecutor):
         self._dapr_client = DaprClient()
 
     async def execute(self, context: RequestContext, event_queue: EventQueue):
-        input_data = EchoInput.model_validate_json(
-            context._params.message.parts[0].root.text
-        )
-        if not input_data or input_data.task_id.strip() == "":
-            await event_queue.enqueue_event(
-                new_agent_text_message("Missing mandatory task_id in the input!")
-            )
-            return
+        input_data = EchoInput.model_validate_json(context.get_user_input())
+        if not input_data or input_data.thread_id.strip() == "":
+            raise ValueError(("Missing mandatory thread_id in the input!"))
 
         proxy = ActorProxy.create(
             actor_type=self._actor_type,
-            actor_id=ActorId(actor_id=input_data.task_id),
+            actor_id=ActorId(actor_id=input_data.thread_id),
             actor_interface=TaskActorInterface,
             actor_proxy_factory=self._factory,
         )
@@ -43,15 +38,12 @@ class EchoAgentExecutor(AgentExecutor):
         input_data = EchoInput.model_validate_json(
             context._params.message.parts[0].root.text
         )
-        if not input_data or input_data.task_id.strip() == "":
-            await event_queue.enqueue_event(
-                new_agent_text_message("Missing mandatory task_id in the input!")
-            )
-            return
+        if not input_data or input_data.thread_id.strip() == "":
+            raise ValueError(("Missing mandatory thread_id in the input!"))
 
         proxy = ActorProxy.create(
             actor_type=self._actor_type,
-            actor_id=ActorId(actor_id=input_data.task_id),
+            actor_id=ActorId(actor_id=input_data.thread_id),
             actor_interface=TaskActorInterface,
             actor_proxy_factory=self._factory,
         )
