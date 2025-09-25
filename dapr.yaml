@@ -22,6 +22,6 @@ apps:
   - appID: a2a-srv # optional
     appDirPath: . # REQUIRED
     appChannelAddress: 127.0.0.1
-    command: ["uv", "run", "a2a-srv"]
+    command: ["uv", "run", "echo-a2a-srv"]
     readBufferSize: 32Ki
     maxBodySize: 256Mi

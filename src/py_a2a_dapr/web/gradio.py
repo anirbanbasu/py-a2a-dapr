@@ -16,7 +16,12 @@ import httpx
 from py_a2a_dapr import env, ic
 import gradio as gr
 
-from py_a2a_dapr.model.task import EchoInput, EchoResponseWithHistory
+from py_a2a_dapr.model.echo_task import (
+    EchoAgentA2AInputMessage,
+    EchoAgentSkills,
+    EchoInput,
+    EchoResponseWithHistory,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -212,14 +217,19 @@ class GradioApp:
                     ).create(card=final_agent_card_to_use)
                     logger.info("A2A client initialised.")
 
-                    input_data = EchoInput(
-                        thread_id=selected_chat_id,
-                        input=txt_input,
+                    message_payload = EchoAgentA2AInputMessage(
+                        skill=EchoAgentSkills.ECHO,
+                        data=EchoInput(
+                            thread_id=selected_chat_id,
+                            user_input=txt_input,
+                        ),
                     )
 
                     send_message = Message(
                         role="user",
-                        parts=[{"kind": "text", "text": input_data.model_dump_json()}],
+                        parts=[
+                            {"kind": "text", "text": message_payload.model_dump_json()}
+                        ],
                         message_id=str(uuid4()),
                     )
 
@@ -239,7 +249,7 @@ class GradioApp:
                                 chat_history.append(
                                     gr.ChatMessage(
                                         role="user",
-                                        content=past_message.input,
+                                        content=past_message.user_input,
                                     )
                                 )
                                 msg_id = str(uuid4())
@@ -266,7 +276,7 @@ class GradioApp:
                             chat_history.append(
                                 gr.ChatMessage(
                                     role="user",
-                                    content=response_with_history.current.input,
+                                    content=response_with_history.current.user_input,
                                 )
                             )
                             msg_id = str(uuid4())

@@ -1,6 +1,7 @@
 from datetime import datetime
 from abc import ABC
-from typing import List, Optional
+from enum import StrEnum, auto
+from typing import List, Optional, Union
 
 from typing_extensions import Annotated
 from pydantic import BaseModel
@@ -14,11 +15,15 @@ class TaskActorInput(BaseModel, ABC):
 
 
 class EchoInput(TaskActorInput):
-    input: Annotated[Optional[str], "Input string to be echoed back"]
+    user_input: Annotated[Optional[str], "Input string to be echoed back"]
+
+
+class EchoHistoryInput(TaskActorInput):
+    pass
 
 
 class EchoResponse(BaseModel):
-    input: Annotated[Optional[str], "Input string to be echoed back"]
+    user_input: Annotated[Optional[str], "User input string to be echoed back"]
     output: Annotated[str, "Output echoed string"]
     timestamp: Annotated[datetime, "Timestamp when the response was generated"]
     actor_id: Annotated[Optional[str], "ID of the actor that processed the request"]
@@ -27,3 +32,18 @@ class EchoResponse(BaseModel):
 class EchoResponseWithHistory(BaseModel):
     current: Annotated[EchoResponse, "Current echoed response"]
     past: Annotated[List[EchoResponse], "History of echoed responses"]
+
+
+class EchoAgentSkills(StrEnum):
+    ECHO = auto()
+    HISTORY = auto()
+
+
+class EchoAgentA2AInputMessage(BaseModel):
+    skill: Annotated[
+        EchoAgentSkills, "Requested skill for which appropriate function is invoked"
+    ]
+    data: Annotated[
+        Union[EchoInput, EchoHistoryInput, None],
+        "Input data for the requested skill. This could be none for some skills.",
+    ]

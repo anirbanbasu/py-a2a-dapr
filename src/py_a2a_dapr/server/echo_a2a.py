@@ -14,7 +14,8 @@ from a2a.types import (
 )
 
 from py_a2a_dapr import env
-from py_a2a_dapr.executor.echo import EchoAgentExecutor
+from py_a2a_dapr.executor.echo_task import EchoAgentExecutor
+from py_a2a_dapr.model.echo_task import EchoAgentSkills
 
 
 async def uvicorn_serve():
@@ -30,23 +31,30 @@ async def uvicorn_serve():
     _a2a_uvicorn_port = env.int("APP_ECHO_A2A_SRV_PORT", 32769)
     signal.signal(signal.SIGINT, sigint_handler)
 
-    skill = AgentSkill(
-        id="echo_skill",
-        name="Echo",
-        description="Echo input messages",
-        tags=["hello", "echo"],
+    echo_skill = AgentSkill(
+        id=f"{EchoAgentSkills.ECHO}_skill",
+        name=EchoAgentSkills.ECHO.capitalize(),
+        description="Echo input messages along with a history of the conversation.",
+        tags=["hello", EchoAgentSkills.ECHO],
         examples=["Ahoy, matey!", "Hello, world!", "Good morning!"],
+    )
+
+    history_skill = AgentSkill(
+        id=f"{EchoAgentSkills.HISTORY}_skill",
+        name=EchoAgentSkills.HISTORY.capitalize(),
+        description="Responds with a history of past messages and their corresponding echoed responses.",
+        tags=[EchoAgentSkills.HISTORY],
     )
     # This will be the public-facing agent card
     public_agent_card = AgentCard(
         name="Echo Agent",
-        description="An agent that can echo input messages",
+        description="An agent that can echo input messages, among other things.",
         url=f"http://{_a2a_uvicorn_host}:{_a2a_uvicorn_port}/",
         version="0.1.0",
         default_input_modes=["text"],
         default_output_modes=["text"],
         capabilities=AgentCapabilities(streaming=True),
-        skills=[skill],  # Only the basic skill for the public card
+        skills=[echo_skill, history_skill],  # Only the basic skill for the public card
         supports_authenticated_extended_card=False,
     )
 
