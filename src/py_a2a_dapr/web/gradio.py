@@ -1,6 +1,7 @@
 import logging
 import signal
 import sys
+from typing import List
 from uuid import uuid4
 
 
@@ -8,18 +9,19 @@ from a2a.client import A2ACardResolver, ClientFactory, ClientConfig
 from a2a.types import (
     Message,
 )
-from a2a.utils.constants import (
-    AGENT_CARD_WELL_KNOWN_PATH,
-)
+from a2a.utils import get_message_text
 
 import httpx
-from py_a2a_dapr import env, ic
+from pydantic import TypeAdapter
+from py_a2a_dapr import env
 import gradio as gr
 
 from py_a2a_dapr.model.echo_task import (
     EchoAgentA2AInputMessage,
     EchoAgentSkills,
+    EchoHistoryInput,
     EchoInput,
+    EchoResponse,
     EchoResponseWithHistory,
 )
 
@@ -34,6 +36,37 @@ class GradioApp:
         self._echo_a2a_base_url = (
             f"http://{self._echo_a2a_uvicorn_host}:{self._echo_a2a_uvicorn_port}"
         )
+
+    def convert_echo_response_to_chat_messages(self, response: EchoResponse):
+        chat_messages = []
+        chat_messages.append(
+            gr.ChatMessage(
+                role="user",
+                content=response.user_input,
+            )
+        )
+        msg_id = str(uuid4())
+        chat_messages.append(
+            gr.ChatMessage(
+                role="assistant",
+                content="",
+                metadata={
+                    "title": response.timestamp.isoformat(),
+                    "status": "done",
+                    "parent_id": msg_id,
+                },
+            )
+        )
+        chat_messages.append(
+            gr.ChatMessage(
+                role="assistant",
+                content=response.output,
+                metadata={
+                    "id": msg_id,
+                },
+            )
+        )
+        return chat_messages
 
     def component_single_a2a_actor(self):
         with gr.Column() as component:
@@ -99,30 +132,87 @@ class GradioApp:
                 else:
                     yield []
 
+            async def refresh_chat_history_from_agent(chat_id: str) -> list:
+                validated_response = []
+                logger.info(f"Refreshing remote chat history for chat ID: {chat_id}")
+                async with httpx.AsyncClient() as httpx_client:
+                    # initialise A2ACardResolver
+                    resolver = A2ACardResolver(
+                        httpx_client=httpx_client,
+                        base_url=self._echo_a2a_base_url,
+                        # agent_card_path uses default, extended_agent_card_path also uses default
+                    )
+                    final_agent_card_to_use = await resolver.get_agent_card()
+
+                    client = ClientFactory(
+                        config=ClientConfig(
+                            streaming=True, polling=True, httpx_client=httpx_client
+                        )
+                    ).create(card=final_agent_card_to_use)
+
+                    message_payload = EchoAgentA2AInputMessage(
+                        skill=EchoAgentSkills.HISTORY,
+                        data=EchoHistoryInput(
+                            thread_id=chat_id,
+                        ),
+                    )
+
+                    send_message = Message(
+                        role="user",
+                        parts=[
+                            {"kind": "text", "text": message_payload.model_dump_json()}
+                        ],
+                        message_id=str(uuid4()),
+                    )
+                    streaming_response = client.send_message(send_message)
+                    logger.info("Parsing streaming response from the A2A endpoint")
+                    response_adapter = TypeAdapter(List[EchoResponse])
+                    async for response in streaming_response:
+                        if isinstance(response, Message):
+                            full_message_content = get_message_text(response)
+                            validated_response = response_adapter.validate_json(
+                                full_message_content
+                            )
+                chat_history = []
+                for past_message in validated_response:
+                    chat_history.extend(
+                        self.convert_echo_response_to_chat_messages(past_message)
+                    )
+                return chat_history
+
             @gr.on(
                 triggers=[state_selected_chat_id.change],
                 inputs=[state_selected_chat_id, bstate_chat_histories],
-                outputs=[btn_chat_delete, chatbot],
+                outputs=[btn_chat_delete, chatbot, bstate_chat_histories],
             )
             async def state_selected_chat_id_changed(
                 selected_chat_id: str, chat_histories: dict
             ):
-                if selected_chat_id and selected_chat_id.strip() != "":
-                    yield (
-                        gr.update(interactive=True),
-                        gr.update(
-                            value=chat_histories.get(selected_chat_id, []),
-                            label=f"Chat ID: {selected_chat_id}",
-                        ),
-                    )
-                else:
-                    yield (
-                        gr.update(interactive=False),
-                        gr.update(
-                            value=[],
-                            label="Chat history (a new chat will be created if none if selected)",
-                        ),
-                    )
+                try:
+                    if selected_chat_id and selected_chat_id.strip() != "":
+                        refreshed_history = await refresh_chat_history_from_agent(
+                            selected_chat_id
+                        )
+                        chat_histories[selected_chat_id] = refreshed_history
+                        yield (
+                            gr.update(interactive=True),
+                            gr.update(
+                                value=chat_histories.get(selected_chat_id, []),
+                                label=f"Chat ID: {selected_chat_id}",
+                            ),
+                            chat_histories,
+                        )
+                    else:
+                        yield (
+                            gr.update(interactive=False),
+                            gr.update(
+                                value=[],
+                                label="Chat history (a new chat will be created if none if selected)",
+                            ),
+                            chat_histories,
+                        )
+                except Exception as e:
+                    raise gr.Error(e)
 
             @gr.on(
                 triggers=[list_task_ids.select],
@@ -185,133 +275,95 @@ class GradioApp:
                 browser_state_chat_histories: dict,
                 chat_history: list,
             ):
-                selected_chat_id = (
-                    state_selected_chat if state_selected_chat else uuid4().hex
-                )
-                if not browser_state_chat_histories:
-                    browser_state_chat_histories = {}
-
-                async with httpx.AsyncClient(timeout=600) as httpx_client:
-                    resolver = A2ACardResolver(
-                        httpx_client=httpx_client,
-                        base_url=self._echo_a2a_base_url,
+                try:
+                    selected_chat_id = (
+                        state_selected_chat if state_selected_chat else uuid4().hex
                     )
-                    # Fetch Public Agent Card and Initialize Client
-                    logger.info(
-                        f"Attempting to fetch public agent card from: {self._echo_a2a_base_url}{AGENT_CARD_WELL_KNOWN_PATH}"
-                    )
-                    final_agent_card_to_use = await resolver.get_agent_card()
+                    if not browser_state_chat_histories:
+                        browser_state_chat_histories = {}
 
-                    yield (
-                        None,
-                        browser_state_chat_histories,
-                        selected_chat_id,
-                        None,
-                        final_agent_card_to_use.model_dump(),
-                    )
-
-                    client = ClientFactory(
-                        config=ClientConfig(
-                            streaming=True, polling=True, httpx_client=httpx_client
+                    logger.info(f"Sending message to A2A endpoint: {txt_input}")
+                    async with httpx.AsyncClient() as httpx_client:
+                        resolver = A2ACardResolver(
+                            httpx_client=httpx_client,
+                            base_url=self._echo_a2a_base_url,
                         )
-                    ).create(card=final_agent_card_to_use)
-                    logger.info("A2A client initialised.")
+                        final_agent_card_to_use = await resolver.get_agent_card()
 
-                    message_payload = EchoAgentA2AInputMessage(
-                        skill=EchoAgentSkills.ECHO,
-                        data=EchoInput(
-                            thread_id=selected_chat_id,
-                            user_input=txt_input,
-                        ),
-                    )
+                        yield (
+                            None,
+                            browser_state_chat_histories,
+                            selected_chat_id,
+                            None,
+                            final_agent_card_to_use.model_dump(),
+                        )
 
-                    send_message = Message(
-                        role="user",
-                        parts=[
-                            {"kind": "text", "text": message_payload.model_dump_json()}
-                        ],
-                        message_id=str(uuid4()),
-                    )
-
-                    streaming_response = client.send_message(send_message)
-                    async for response in streaming_response:
-                        if isinstance(response, Message):
-                            response_with_history = (
-                                EchoResponseWithHistory.model_validate_json(
-                                    response.parts[0].root.text
-                                )
+                        client = ClientFactory(
+                            config=ClientConfig(
+                                streaming=True, polling=True, httpx_client=httpx_client
                             )
-                            # Although this may seem strange to clear the history, it is necessary
-                            # because the chat may have been modified by another call to the same actor from another client.
-                            chat_history.clear()
-                            # Add any historical messages first -- they are already in reverse chronological order
-                            for past_message in response_with_history.past:
-                                chat_history.append(
-                                    gr.ChatMessage(
-                                        role="user",
-                                        content=past_message.user_input,
+                        ).create(card=final_agent_card_to_use)
+
+                        message_payload = EchoAgentA2AInputMessage(
+                            skill=EchoAgentSkills.ECHO,
+                            data=EchoInput(
+                                thread_id=selected_chat_id,
+                                user_input=txt_input,
+                            ),
+                        )
+
+                        send_message = Message(
+                            role="user",
+                            parts=[
+                                {
+                                    "kind": "text",
+                                    "text": message_payload.model_dump_json(),
+                                }
+                            ],
+                            message_id=str(uuid4()),
+                        )
+
+                        streaming_response = client.send_message(send_message)
+                        logger.info("Parsing streaming response from the A2A endpoint")
+                        async for response in streaming_response:
+                            if isinstance(response, Message):
+                                full_message_content = get_message_text(response)
+                                response_with_history = (
+                                    EchoResponseWithHistory.model_validate_json(
+                                        full_message_content
                                     )
                                 )
-                                msg_id = str(uuid4())
-                                chat_history.append(
-                                    gr.ChatMessage(
-                                        role="assistant",
-                                        content="",
-                                        metadata={
-                                            "title": past_message.timestamp.isoformat(),
-                                            "status": "done",
-                                            "parent_id": msg_id,
-                                        },
+                                # Although this may seem strange to clear the history, it is necessary
+                                # because the chat may have been modified by another call to the same actor from another client.
+                                chat_history.clear()
+                                # Add any historical messages first -- they are already in reverse chronological order
+                                for past_message in response_with_history.past:
+                                    chat_history.extend(
+                                        self.convert_echo_response_to_chat_messages(
+                                            past_message
+                                        )
+                                    )
+                                # Then add the current message
+                                chat_history.extend(
+                                    self.convert_echo_response_to_chat_messages(
+                                        response_with_history.current
                                     )
                                 )
-                                chat_history.append(
-                                    gr.ChatMessage(
-                                        role="assistant",
-                                        content=past_message.output,
-                                        metadata={
-                                            "id": msg_id,
-                                        },
-                                    )
+
+                                browser_state_chat_histories[selected_chat_id] = (
+                                    chat_history
                                 )
-                            chat_history.append(
-                                gr.ChatMessage(
-                                    role="user",
-                                    content=response_with_history.current.user_input,
+                                yield (
+                                    None,
+                                    browser_state_chat_histories,
+                                    selected_chat_id,
+                                    gr.update(
+                                        value=chat_history,
+                                    ),
+                                    final_agent_card_to_use.model_dump(),
                                 )
-                            )
-                            msg_id = str(uuid4())
-                            chat_history.append(
-                                gr.ChatMessage(
-                                    role="assistant",
-                                    content="",
-                                    metadata={
-                                        "title": response_with_history.current.timestamp.isoformat(),
-                                        "status": "done",
-                                        "parent_id": msg_id,
-                                    },
-                                )
-                            )
-                            chat_history.append(
-                                gr.ChatMessage(
-                                    role="assistant",
-                                    content=response_with_history.current.output,
-                                )
-                            )
-                            browser_state_chat_histories[selected_chat_id] = (
-                                chat_history
-                            )
-                            yield (
-                                None,
-                                browser_state_chat_histories,
-                                selected_chat_id,
-                                gr.update(
-                                    value=chat_history,
-                                ),
-                                final_agent_card_to_use.model_dump(),
-                            )
-                        else:
-                            logger.info(f"Received non-Message response: {response}")
-                            ic(response, type(response))
+                except Exception as e:
+                    raise gr.Error(e)
 
             return component
 

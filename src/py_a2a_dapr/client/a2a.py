@@ -77,7 +77,7 @@ async def echo_a2a_echo(
     Query the echo A2A endpoint with a message and print the response.
     """
 
-    async with httpx.AsyncClient(timeout=600) as httpx_client:
+    async with httpx.AsyncClient() as httpx_client:
         # initialise A2ACardResolver
         resolver = A2ACardResolver(
             httpx_client=httpx_client,
@@ -140,7 +140,7 @@ async def echo_a2a_history(
     Retrieve the history of messages for a given thread ID from the A2A endpoint.
     """
 
-    async with httpx.AsyncClient(timeout=600) as httpx_client:
+    async with httpx.AsyncClient() as httpx_client:
         # initialise A2ACardResolver
         resolver = A2ACardResolver(
             httpx_client=httpx_client,

@@ -51,8 +51,8 @@ async def uvicorn_serve():
         description="An agent that can echo input messages, among other things.",
         url=f"http://{_a2a_uvicorn_host}:{_a2a_uvicorn_port}/",
         version="0.1.0",
-        default_input_modes=["text"],
-        default_output_modes=["text"],
+        default_input_modes=["application/json"],
+        default_output_modes=["application/json"],
         capabilities=AgentCapabilities(streaming=True),
         skills=[echo_skill, history_skill],  # Only the basic skill for the public card
         supports_authenticated_extended_card=False,
