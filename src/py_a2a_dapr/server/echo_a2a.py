@@ -45,6 +45,13 @@ async def uvicorn_serve():
         description="Responds with a history of past messages and their corresponding echoed responses.",
         tags=[EchoAgentSkills.HISTORY],
     )
+
+    delete_history_skill = AgentSkill(
+        id=f"{EchoAgentSkills.DELETE_HISTORY}_skill",
+        name=EchoAgentSkills.DELETE_HISTORY.capitalize(),
+        description="Deletes the history of past messages and their corresponding echoed responses.",
+        tags=[EchoAgentSkills.DELETE_HISTORY],
+    )
     # This will be the public-facing agent card
     public_agent_card = AgentCard(
         name="Echo Agent",
@@ -54,7 +61,11 @@ async def uvicorn_serve():
         default_input_modes=["application/json"],
         default_output_modes=["application/json"],
         capabilities=AgentCapabilities(streaming=True),
-        skills=[echo_skill, history_skill],  # Only the basic skill for the public card
+        skills=[
+            echo_skill,
+            history_skill,
+            delete_history_skill,
+        ],  # Only the basic skill for the public card
         supports_authenticated_extended_card=False,
     )
 

@@ -6,6 +6,7 @@ from a2a.utils import new_agent_text_message
 
 from py_a2a_dapr.actor.echo_task import EchoTaskActorInterface
 from py_a2a_dapr.model.echo_task import (
+    DeleteEchoHistoryInput,
     EchoHistoryInput,
     EchoInput,
     EchoAgentA2AInputMessage,
@@ -37,8 +38,18 @@ class EchoAgentExecutor(AgentExecutor):
             actor_interface=EchoTaskActorInterface,
             actor_proxy_factory=self._factory,
         )
+        result = await proxy.invoke_method(method="History")
+        return result.decode().strip("\"'")
+
+    async def perform_delete_history(self, data: DeleteEchoHistoryInput) -> str:
+        proxy = ActorProxy.create(
+            actor_type=self._actor_type,
+            actor_id=ActorId(actor_id=data.thread_id),
+            actor_interface=EchoTaskActorInterface,
+            actor_proxy_factory=self._factory,
+        )
         result = await proxy.invoke_method(
-            method="History", raw_body=data.model_dump_json().encode()
+            method="DeleteHistory",
         )
         return result.decode().strip("\"'")
 
@@ -59,6 +70,8 @@ class EchoAgentExecutor(AgentExecutor):
                 response = await self.perform_echo(data=message_payload.data)
             case EchoAgentSkills.HISTORY:
                 response = await self.perform_history(data=message_payload.data)
+            case EchoAgentSkills.DELETE_HISTORY:
+                response = await self.perform_delete_history(data=message_payload.data)
             case _:
                 raise ValueError(f"Unknown skill '{message_payload.skill}' requested!")
         if response:

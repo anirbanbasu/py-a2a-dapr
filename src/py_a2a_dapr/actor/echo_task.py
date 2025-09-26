@@ -15,6 +15,10 @@ class EchoTaskActorInterface(ActorInterface):
     async def history(self) -> list | None: ...
 
     @abstractmethod
+    @actormethod(name="DeleteHistory")
+    async def delete_history(self) -> str | None: ...
+
+    @abstractmethod
     @actormethod(name="Cancel")
     async def cancel(self) -> str: ...
 
@@ -71,6 +75,19 @@ class EchoTaskActor(Actor, EchoTaskActorInterface):
         ]
         response = [item.model_dump() for item in history_validated]
         return response
+
+    async def delete_history(self) -> str | None:
+        if self._cancelled:
+            return None
+        logger.debug(f"DeleteHistory called on actor {self.id}")
+        if await self._state_manager.contains_state(self._history_key):
+            await self._state_manager.remove_state(self._history_key)
+            await self._state_manager.save_state()
+            logger.debug(f"History deleted for actor {self.id}")
+            return f"History was deleted successfully for {self.id}."
+        else:
+            logger.debug(f"No history was found to delete for actor {self.id}")
+            return f"No history was found for {self.id}."
 
     async def cancel(self) -> str:
         logger.debug(f"Cancel signal received for actor {self.id}")

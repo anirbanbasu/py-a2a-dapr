@@ -83,3 +83,13 @@ class TestCLI:
             assert len(validated_response) == self.echo_iteratons
         for resp in validated_response:
             assert isinstance(resp, EchoResponse)
+
+    def test_echo_a2a_delete_history(self, manage_dapr_sidecars) -> None:
+        # Iterations are there to create a history in the response.
+        runner = CliRunner()
+        result = runner.invoke(
+            app, ["echo-a2a-delete-history", "--thread-id", self.thread_id]
+        )
+        assert result.exit_code == 0
+        assert "deleted successfully" in result.stdout
+        assert self.thread_id in result.stdout

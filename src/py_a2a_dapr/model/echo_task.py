@@ -22,6 +22,10 @@ class EchoHistoryInput(TaskActorInput):
     pass
 
 
+class DeleteEchoHistoryInput(TaskActorInput):
+    pass
+
+
 class EchoResponse(BaseModel):
     user_input: Annotated[Optional[str], "User input string to be echoed back"]
     output: Annotated[str, "Output echoed string"]
@@ -37,6 +41,7 @@ class EchoResponseWithHistory(BaseModel):
 class EchoAgentSkills(StrEnum):
     ECHO = auto()
     HISTORY = auto()
+    DELETE_HISTORY = auto()
 
 
 class EchoAgentA2AInputMessage(BaseModel):
@@ -44,6 +49,6 @@ class EchoAgentA2AInputMessage(BaseModel):
         EchoAgentSkills, "Requested skill for which appropriate function is invoked"
     ]
     data: Annotated[
-        Union[EchoInput, EchoHistoryInput, None],
-        "Input data for the requested skill. This could be none for some skills.",
+        Union[EchoInput, EchoHistoryInput, DeleteEchoHistoryInput],
+        "Input data for the requested skill.",
     ]

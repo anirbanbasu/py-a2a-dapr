@@ -24,6 +24,7 @@ from a2a.utils.constants import (
 )
 
 from py_a2a_dapr.model.echo_task import (
+    DeleteEchoHistoryInput,
     EchoAgentA2AInputMessage,
     EchoAgentSkills,
     EchoHistoryInput,
@@ -133,7 +134,7 @@ async def echo_a2a_echo(
 @partial(syncify, raise_sync_error=False)
 async def echo_a2a_history(
     thread_id: str = typer.Option(
-        help="A thread ID to identify your conversation. If not specified, a random UUID will be used.",
+        help="A thread ID to identify your conversation.",
     ),
 ) -> None:
     """
@@ -190,6 +191,62 @@ async def echo_a2a_history(
                     ::-1
                 ]  # Reverse to chronological order to look right in the CLI
                 print_json(response_adapter.dump_json(validated_response).decode())
+
+
+@cli_app.command()
+@partial(syncify, raise_sync_error=False)
+async def echo_a2a_delete_history(
+    thread_id: str = typer.Option(
+        help="A thread ID to identify your conversation.",
+    ),
+) -> None:
+    """
+    Delete the history of messages for a given thread ID from the A2A endpoint.
+    """
+
+    async with httpx.AsyncClient() as httpx_client:
+        # initialise A2ACardResolver
+        resolver = A2ACardResolver(
+            httpx_client=httpx_client,
+            base_url=base_url,
+            # agent_card_path uses default, extended_agent_card_path also uses default
+        )
+        final_agent_card_to_use: AgentCard | None = None
+
+        logger.info(
+            f"Attempting to fetch public agent card from: {base_url}{AGENT_CARD_WELL_KNOWN_PATH}"
+        )
+        _public_card = (
+            await resolver.get_agent_card()
+        )  # Fetches from default public path
+        logger.info("Successfully fetched public agent card:")
+        logger.info(_public_card.model_dump_json(indent=2, exclude_none=True))
+        final_agent_card_to_use = _public_card
+
+        client = ClientFactory(
+            config=ClientConfig(streaming=True, polling=True, httpx_client=httpx_client)
+        ).create(card=final_agent_card_to_use)
+        logger.info("A2A client initialised.")
+
+        message_payload = EchoAgentA2AInputMessage(
+            skill=EchoAgentSkills.DELETE_HISTORY,
+            data=DeleteEchoHistoryInput(
+                thread_id=thread_id,
+            ),
+        )
+
+        send_message = Message(
+            role="user",
+            parts=[{"kind": "text", "text": message_payload.model_dump_json()}],
+            message_id=str(uuid4()),
+        )
+        logger.info("Sending message to the A2A endpoint")
+        streaming_response = client.send_message(send_message)
+        logger.info("Parsing streaming response from the A2A endpoint")
+        async for response in streaming_response:
+            if isinstance(response, Message):
+                full_message_content = get_message_text(response)
+                print(full_message_content)
 
 
 def main():  # pragma: no cover

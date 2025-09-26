@@ -17,6 +17,7 @@ from py_a2a_dapr import env
 import gradio as gr
 
 from py_a2a_dapr.model.echo_task import (
+    DeleteEchoHistoryInput,
     EchoAgentA2AInputMessage,
     EchoAgentSkills,
     EchoHistoryInput,
@@ -221,6 +222,43 @@ class GradioApp:
             async def list_task_ids_selected(evt: gr.SelectData):
                 yield evt.value
 
+            async def delete_remote_chat_history(chat_id: str):
+                logger.info(f"Deleting remote chat history for chat ID: {chat_id}")
+                async with httpx.AsyncClient() as httpx_client:
+                    # initialise A2ACardResolver
+                    resolver = A2ACardResolver(
+                        httpx_client=httpx_client,
+                        base_url=self._echo_a2a_base_url,
+                        # agent_card_path uses default, extended_agent_card_path also uses default
+                    )
+                    final_agent_card_to_use = await resolver.get_agent_card()
+
+                    client = ClientFactory(
+                        config=ClientConfig(
+                            streaming=True, polling=True, httpx_client=httpx_client
+                        )
+                    ).create(card=final_agent_card_to_use)
+
+                    message_payload = EchoAgentA2AInputMessage(
+                        skill=EchoAgentSkills.DELETE_HISTORY,
+                        data=DeleteEchoHistoryInput(
+                            thread_id=chat_id,
+                        ),
+                    )
+
+                    send_message = Message(
+                        role="user",
+                        parts=[
+                            {"kind": "text", "text": message_payload.model_dump_json()}
+                        ],
+                        message_id=str(uuid4()),
+                    )
+                    streaming_response = client.send_message(send_message)
+                    async for response in streaming_response:
+                        if isinstance(response, Message):
+                            full_message_content = get_message_text(response)
+                logger.info(full_message_content)
+
             @gr.on(
                 triggers=[btn_chat_delete.click],
                 inputs=[bstate_chat_histories, state_selected_chat_id],
@@ -231,6 +269,7 @@ class GradioApp:
             ):
                 if selected_chat_id and browser_state_chat_histories:
                     if selected_chat_id in browser_state_chat_histories:
+                        await delete_remote_chat_history(selected_chat_id)
                         del browser_state_chat_histories[selected_chat_id]
                         selected_chat_id = None
                     else:
