@@ -32,10 +32,10 @@ class EchoTaskActor(Actor, EchoTaskActorInterface):
         self._cancelled = False
         self._history_key = "echo_history"
 
-    async def on_activate(self) -> None:
+    async def _on_activate(self) -> None:
         logger.debug(f"{self.__class__.__name__} activated")
 
-    async def on_deactivate(self) -> None:
+    async def _on_deactivate(self) -> None:
         logger.debug(f"{self.__class__.__name__} deactivated")
 
     async def echo(self, data: dict | None = None) -> dict | None:
